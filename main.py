@@ -69,21 +69,37 @@ class UploadHandler(blobstore_handlers.BlobstoreUploadHandler):
         self.redirect('/')
 
 class ViewHandler(blobstore_handlers.BlobstoreDownloadHandler):
-        def get(self):
-            user = users.get_current_user()
-            upload_key_str = self.request.params.get('key')
-            upload = None
-            if upload_key_str:
-                upload = db.get(upload_key_str)
+    def get(self):
+        user = users.get_current_user()
+        upload_key_str = self.request.params.get('key')
+        upload = None
+        if upload_key_str:
+            upload = db.get(upload_key_str)
 
-            if (not user or not upload or upload.user != user):
-                self.error(404)
-                return
+        if (not user or not upload or upload.user != user):
+            self.error(404)
+            return
 
-            self.send_blob(upload.blob)
+        self.send_blob(upload.blob)
+
+class DeleteHandler(webapp2.RequestHandler):
+    def post(self):
+        user = users.get_current_user()
+        if user:
+            entities_to_delete = []
+            for delete_key in self.request.params.getall('delete'):
+                upload = db.get(delete_key)
+                if upload.user != user:
+                    continue
+                entities_to_delete.append(upload.key())
+                entities_to_delete.append(db.Key.from_path('__BlobInfo__',
+                                          str(upload.blob.key())))
+                db.delete(entities_to_delete)
+        self.redirect('/')
 
 app = webapp2.WSGIApplication([
     ('/', MainPage),
     ('/upload', UploadHandler),
-    ('/view', ViewHandler)
+    ('/view', ViewHandler),
+    ('/delete', DeleteHandler)
 ], debug=True)
