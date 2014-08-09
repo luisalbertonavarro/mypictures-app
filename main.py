@@ -61,13 +61,29 @@ class UploadHandler(blobstore_handlers.BlobstoreUploadHandler):
         description = self.request.params['description']
 
         for blob_info in self.get_uploads('upload'):
-            upload = UserUpload( parent=db.Key.from_path('UserUploadGroup', user.email()),
-                                 user=user,
-                                 description=description,
-                                 blob=blob_info.key())
+            upload = UserUpload(parent=db.Key.from_path('UserUploadGroup', user.email()),
+                                user=user,
+                                description=description,
+                                blob=blob_info.key())
             upload.put()
         self.redirect('/')
 
+class ViewHandler(blobstore_handlers.BlobstoreDownloadHandler):
+        def get(self):
+            user = users.get_current_user()
+            upload_key_str = self.request.params.get('key')
+            upload = None
+            if upload_key_str:
+                upload = db.get(upload_key_str)
+
+            if (not user or not upload or upload.user != user):
+                self.error(404)
+                return
+
+            self.send_blob(upload.blob)
+
 app = webapp2.WSGIApplication([
-    ('/', MainPage)
+    ('/', MainPage),
+    ('/upload', UploadHandler),
+    ('/view', ViewHandler)
 ], debug=True)
